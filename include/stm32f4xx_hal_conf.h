@@ -12,7 +12,7 @@ extern "C" {
 #endif
 
 /* ============================================================================
- * Module Selection - Uncomment modules yang dipakai
+ * Module Selection
  * ============================================================================ */
 #define HAL_MODULE_ENABLED
 #define HAL_GPIO_MODULE_ENABLED
@@ -22,15 +22,13 @@ extern "C" {
 #define HAL_PWR_MODULE_ENABLED
 #define HAL_FLASH_MODULE_ENABLED
 #define HAL_DMA_MODULE_ENABLED
-
-/* Uncomment jika perlu UART untuk debugging */
-// #define HAL_UART_MODULE_ENABLED
+#define HAL_UART_MODULE_ENABLED         /* UART untuk Serial Monitor */
 
 /* ============================================================================
  * Oscillator Values
  * ============================================================================ */
 #if !defined(HSE_VALUE)
-#define HSE_VALUE    25000000U    // 25 MHz external crystal (Black Pill)
+#define HSE_VALUE    25000000U
 #endif
 
 #if !defined(HSE_STARTUP_TIMEOUT)
@@ -38,7 +36,7 @@ extern "C" {
 #endif
 
 #if !defined(HSI_VALUE)
-#define HSI_VALUE    16000000U    // 16 MHz internal oscillator
+#define HSI_VALUE    16000000U
 #endif
 
 #if !defined(LSI_VALUE)
@@ -60,17 +58,12 @@ extern "C" {
 /* ============================================================================
  * System Configuration
  * ============================================================================ */
-#define VDD_VALUE                    3300U      // 3.3V dalam mV
+#define VDD_VALUE                    3300U
 #define TICK_INT_PRIORITY            0x0FU
 #define USE_RTOS                     0U
 #define PREFETCH_ENABLE              1U
 #define INSTRUCTION_CACHE_ENABLE     1U
 #define DATA_CACHE_ENABLE            1U
-
-/* ============================================================================
- * Assert Configuration
- * ============================================================================ */
-/* #define USE_FULL_ASSERT    1U */
 
 /* ============================================================================
  * Include HAL Drivers
@@ -110,6 +103,8 @@ extern "C" {
 /* ============================================================================
  * Assert Macro
  * ============================================================================ */
+/* #define USE_FULL_ASSERT    1U */
+
 #ifdef USE_FULL_ASSERT
 #define assert_param(expr) ((expr) ? (void)0U : assert_failed((uint8_t *)__FILE__, __LINE__))
 void assert_failed(uint8_t *file, uint32_t line);
