@@ -732,23 +732,31 @@ static void MX_TIM1_PWM_Init_RegisterLevel(void)
     
     /* Configure PA8 sebagai TIM1_CH1 (AF1) */
     GPIOA->MODER &= ~GPIO_MODER_MODER8;
-    GPIOA->MODER |= GPIO_MODER_MODER8_1;        /* AF mode */
+    GPIOA->MODER |= GPIO_MODER_MODER8_1;
     GPIOA->AFR[1] &= ~GPIO_AFRH_AFSEL8;
-    GPIOA->AFR[1] |= (1 << GPIO_AFRH_AFSEL8_Pos);  /* AF1 = TIM1 */
+    GPIOA->AFR[1] |= (1 << GPIO_AFRH_AFSEL8_Pos);
     
     /* Reset TIM1 */
     TIM1->CR1 = 0;
     TIM1->CR2 = 0;
     
-    /* Set Prescaler dan Auto-Reload */
-    TIM1->PSC = 99;         /* 100MHz / 100 = 1MHz */
-    TIM1->ARR = PWM_PERIOD; /* 1MHz / 1000 = 1kHz */
-    TIM1->CCR1 = 0;         /* Initial duty = 0% */
+    /* ============================================
+     * PWM FREQUENCY CONFIGURATION
+     * ============================================
+     * Target: 25 kHz (di atas pendengaran manusia)
+     * 
+     * Freq = TIM_CLK / (PSC + 1) / (ARR + 1)
+     * 25000 = 100000000 / (3 + 1) / (999 + 1)
+     * 25000 = 100000000 / 4 / 1000 ✓
+     * ============================================ */
+    TIM1->PSC = 129;          // 100MHz / 4 = 25MHz timer clock
+    TIM1->ARR = PWM_PERIOD; // 25MHz / 1000 = 25kHz PWM
+    TIM1->CCR1 = 0;
     
     /* PWM Mode 1 pada Channel 1 */
     TIM1->CCMR1 &= ~TIM_CCMR1_OC1M;
-    TIM1->CCMR1 |= (TIM_CCMR1_OC1M_2 | TIM_CCMR1_OC1M_1);  /* PWM Mode 1 (110) */
-    TIM1->CCMR1 |= TIM_CCMR1_OC1PE;     /* Preload enable */
+    TIM1->CCMR1 |= (TIM_CCMR1_OC1M_2 | TIM_CCMR1_OC1M_1);
+    TIM1->CCMR1 |= TIM_CCMR1_OC1PE;
     
     /* Enable Channel 1 output */
     TIM1->CCER |= TIM_CCER_CC1E;
