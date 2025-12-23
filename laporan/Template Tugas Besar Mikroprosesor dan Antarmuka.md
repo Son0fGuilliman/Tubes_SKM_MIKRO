@@ -19,6 +19,7 @@ Contoh: REACTION TIME GAME DENGAN STM32F411
 IMPLEMENTASI I2C, TIMER INTERRUPT, DAN REGISTER-BASED PROGRAMMING
 
 Kelompok: 7
+
 1. Firdaus Arif Ramadhani (101032300131) - [Bagian Tugas]
 2. Azmi Aziz Syahputra (101032300131) - [Bagian Tugas]
 3. Muhammad Haiqal (101032300125) - [Bagian Tugas]
@@ -76,10 +77,10 @@ Template paragraf:
 
 - **Umum**: [Tujuan utama proyek]
 - **Khusus**:
-    - Serial Communication (20%): [target spesifik]
-    - Timer & Interrupt (40%): [target spesifik]
-    - Register Programming (30%): [target spesifik]
-    - Integration (10%): [target spesifik]
+  - Serial Communication (20%): [target spesifik]
+  - Timer & Interrupt (40%): [target spesifik]
+  - Register Programming (30%): [target spesifik]
+  - Integration (10%): [target spesifik]
 
 ## 1.4 Batasan Masalah
 
@@ -103,7 +104,7 @@ Template paragraf:
 
 ## 2.2 Serial Communication
 
-### 2.2.1 Protokol UART *(jika digunakan)*
+### 2.2.1 Protokol UART _(jika digunakan)_
 
 - Baud rate calculation
 - Frame format
@@ -129,7 +130,7 @@ Template paragraf:
 - Output modes: Push-pull, Open-drain
 - Register: GPIOx_CRL, GPIOx_CRH, GPIOx_IDR, GPIOx_ODR
 
-## 2.6 ADC *(jika digunakan)*
+## 2.6 ADC _(jika digunakan)_
 
 - Conversion modes
 - Sampling time
@@ -153,11 +154,11 @@ Sistem [nama proyek] bertujuan untuk [tujuan utama]. Persyaratan utama:
 
 ## 3.2 Functional Requirements
 
-| ID | Requirement | Priority |
-| --- | --- | --- |
-| FR-01 | [Fungsi 1] | High |
-| FR-02 | [Fungsi 2 bisa melakukan .. ] | High |
-| FR-03 | [Fungsi 3] | Medium |
+| ID    | Requirement                   | Priority |
+| ----- | ----------------------------- | -------- |
+| FR-01 | [Fungsi 1]                    | High     |
+| FR-02 | [Fungsi 2 bisa melakukan .. ] | High     |
+| FR-03 | [Fungsi 3]                    | Medium   |
 
 ## 3.3 System Specifications
 
@@ -165,22 +166,22 @@ Sistem [nama proyek] bertujuan untuk [tujuan utama]. Persyaratan utama:
 
 **Komponen Utama:**
 
-| Komponen | Spesifikasi | Jumlah | Fungsi |
-| --- | --- | --- | --- |
-| Mikrokontroler | STM32F4xx | 1 | Processing unit |
-| LCD | 16x2 I2C | 1 | Display output |
-| Button | Push button | 2 | User input |
-| LED | 5mm | 3 | Visual indicator |
-| [tambahkan] | [spesifikasi] | [qty] | [fungsi] |
+| Komponen       | Spesifikasi   | Jumlah | Fungsi           |
+| -------------- | ------------- | ------ | ---------------- |
+| Mikrokontroler | STM32F4xx     | 1      | Processing unit  |
+| LCD            | 16x2 I2C      | 1      | Display output   |
+| Button         | Push button   | 2      | User input       |
+| LED            | 5mm           | 3      | Visual indicator |
+| [tambahkan]    | [spesifikasi] | [qty]  | [fungsi]         |
 
 **Pin Mapping:**
 
-| Pin STM32 | Connect To | Fungsi | Peripheral |
-| --- | --- | --- | --- |
-| PB6 | LCD SCL | I2C Clock | I2C1_SCL |
-| PB7 | LCD SDA | I2C Data | I2C1_SDA |
-| PA0 | Button 1 | Input | EXTI0 |
-| [tambahkan] | [device] | [fungsi] | [peripheral] |
+| Pin STM32   | Connect To | Fungsi    | Peripheral   |
+| ----------- | ---------- | --------- | ------------ |
+| PB6         | LCD SCL    | I2C Clock | I2C1_SCL     |
+| PB7         | LCD SDA    | I2C Data  | I2C1_SDA     |
+| PA0         | Button 1   | Input     | EXTI0        |
+| [tambahkan] | [device]   | [fungsi]  | [peripheral] |
 
 ### 3.3.2 Software Specifications
 
@@ -215,12 +216,12 @@ Minimal berisi:
 
 ### 4.2.2 Bill of Materials (BOM)
 
-| No | Komponen | Nilai/Tipe | Qty | Harga (Rp) |
-| --- | --- | --- | --- | --- |
-| 1 | STM32F4xxx | - | 1 | 85.000 |
-| 2 | LCD I2C | 16x2 | 1 | 15.000 |
-| [dst] | [komponen] | [nilai] | [qty] | [harga] |
-| **TOTAL** |  |  |  | **[total]** |
+| No        | Komponen   | Nilai/Tipe | Qty   | Harga (Rp)  |
+| --------- | ---------- | ---------- | ----- | ----------- |
+| 1         | STM32F4xxx | -          | 1     | 85.000      |
+| 2         | LCD I2C    | 16x2       | 1     | 15.000      |
+| [dst]     | [komponen] | [nilai]    | [qty] | [harga]     |
+| **TOTAL** |            |            |       | **[total]** |
 
 ## 4.3 Desain Software
 
@@ -352,11 +353,11 @@ void RCC_init(void) {
 
 **Penjelasan Register:**
 
-| Register | Bit | Value | Fungsi |
-| --- | --- | --- | --- |
-| RCC->x |  | 1 |  |
-| RCC->x |  | 1 (read) |  |
-| [dst] | [bit] | [value] | [fungsi] |
+| Register | Bit   | Value    | Fungsi   |
+| -------- | ----- | -------- | -------- |
+| RCC->x   |       | 1        |          |
+| RCC->x   |       | 1 (read) |          |
+| [dst]    | [bit] | [value]  | [fungsi] |
 
 ### 5.2.2 GPIO Configuration
 
@@ -416,11 +417,11 @@ void EXTI0_IRQHandler(void) {
 
 ## 5.3 Pembagian Tugas Kelompok
 
-| Anggota | Tugas | Status |
-| --- | --- | --- |
-| FAR | Hardware Design & Wiring, GPIO | ✓ |
-| AZM | UART, Timer Counter, Documentation | ✓ |
-| ARM | Interrupt, Itegration & Testing | ✓ |
+| Anggota | Tugas                              | Status |
+| ------- | ---------------------------------- | ------ |
+| FAR     | Hardware Design & Wiring, GPIO     | ✓      |
+| AZM     | UART, Timer Counter, Documentation | ✓      |
+| ARM     | Interrupt, Itegration & Testing    | ✓      |
 
 ---
 
@@ -449,10 +450,10 @@ void EXTI0_IRQHandler(void) {
 
 ## 6.6 Troubleshooting
 
-| Problem | Cause | Solution |
-| --- | --- | --- |
-| I2C not working | [penyebab] | [solusi] |
-| [problem] | [cause] | [solution] |
+| Problem         | Cause      | Solution   |
+| --------------- | ---------- | ---------- |
+| I2C not working | [penyebab] | [solusi]   |
+| [problem]       | [cause]    | [solution] |
 
 ---
 
@@ -481,11 +482,11 @@ Seluruh ide, analisis, perhitungan, desain, dan konten substantif merupakan hasi
 
 Sebagai bentuk transparansi, berikut adalah daftar penggunaan AI beserta nama alat AI yang digunakan:
 
-| No. | Bagian yang Diedit | Jenis Bantuan AI | Nama AI yang Digunakan |
-| --- | --- | --- | --- |
-| 1 | (isi sesuai penggunaan) | (jenis bantuan) | (nama AI) |
-| 2 | (isi sesuai penggunaan) | (jenis bantuan) | (nama AI) |
-| 3 | (isi sesuai penggunaan) | (jenis bantuan) | (nama AI) |
+| No. | Bagian yang Diedit      | Jenis Bantuan AI | Nama AI yang Digunakan |
+| --- | ----------------------- | ---------------- | ---------------------- |
+| 1   | (isi sesuai penggunaan) | (jenis bantuan)  | (nama AI)              |
+| 2   | (isi sesuai penggunaan) | (jenis bantuan)  | (nama AI)              |
+| 3   | (isi sesuai penggunaan) | (jenis bantuan)  | (nama AI)              |
 
 Nama Mahasiswa: (Mahasiswa 1, 2, 3)
 
@@ -531,30 +532,30 @@ QR Code: [QR code ke video]
 
 **Content: 10%**
 
-- [ ]  Abstrak
-- [ ]  BAB I-VII lengkap
-- [ ]  Minimum 20 halaman (tidak termasuk lampiran)
-- [ ]  Semua gambar, table diberi caption dan nomor
+- [ ] Abstrak
+- [ ] BAB I-VII lengkap
+- [ ] Minimum 20 halaman (tidak termasuk lampiran)
+- [ ] Semua gambar, table diberi caption dan nomor
 
 **Technical: 40%**
 
-- [ ]  Register configuration explained dengan tabel
-- [ ]  Schematic diagram, jelas dan lengkap
-- [ ]  Flowchart dan state machine included
-- [ ]  Photo dokumentasi hardware
-- [ ]  Video demonstration
+- [ ] Register configuration explained dengan tabel
+- [ ] Schematic diagram, jelas dan lengkap
+- [ ] Flowchart dan state machine included
+- [ ] Photo dokumentasi hardware
+- [ ] Video demonstration
 
 **CLO3 Requirements: 40 %**
 
-- [ ]  Penerapan Serial communication (I2C/UART/SPI)
-- [ ]  Penerapan Timer configuration explained
-- [ ]  Interrupt system explained
-- [ ]  Register-level code documented
-- [ ]  Integration testing performed
+- [ ] Penerapan Serial communication (I2C/UART/SPI)
+- [ ] Penerapan Timer configuration explained
+- [ ] Interrupt system explained
+- [ ] Register-level code documented
+- [ ] Integration testing performed
 
 **Formatting: 10%**
 
-- [ ]  Font: Times New Roman 12pt
-- [ ]  Line spacing: 1.5
-- [ ]  Margin: 4-3-3-3 cm
-- [ ]  Page numbers
+- [ ] Font: Times New Roman 12pt
+- [ ] Line spacing: 1.5
+- [ ] Margin: 4-3-3-3 cm
+- [ ] Page numbers
