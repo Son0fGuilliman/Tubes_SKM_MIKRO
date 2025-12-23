@@ -167,13 +167,12 @@ void MX_TIM2_Interrupt_Init_RegisterLevel(void) {
 void Update_LEDs_Temperature(float temp, float setpoint) {
   GPIOB->BSRR = (GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2) << 16;
 
-  float lower = setpoint - TEMP_LED_MARGIN;
   float upper = setpoint + TEMP_LED_MARGIN;
 
-  if (temp < lower)
-    GPIOB->BSRR = GPIO_PIN_0; /* Hijau */
-  else if (temp > upper)
-    GPIOB->BSRR = GPIO_PIN_2; /* Merah */
+  if (temp <= setpoint)
+    GPIOB->BSRR = GPIO_PIN_0; /* Hijau (Safe / Fan Off) */
+  else if (temp <= upper)
+    GPIOB->BSRR = GPIO_PIN_1; /* Kuning (Controlling / Fan Ramping) */
   else
-    GPIOB->BSRR = GPIO_PIN_1; /* Kuning */
+    GPIOB->BSRR = GPIO_PIN_2; /* Merah (Hot / Fan Max) */
 }

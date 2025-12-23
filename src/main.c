@@ -11,12 +11,16 @@
 #include "uart_lib.h"
 
 /* ============================================================================
- * CONTROL CONFIGURATION (SIMPLE ON/OFF)
+ * CONTROL CONFIGURATION (PROPORTIONAL CONTROL)
  * ============================================================================
  */
 #define SETPOINT_DEFAULT 30.0f /* Default target temperature (°C) */
 #define SETPOINT_MIN 20.0f     /* Minimum setpoint */
 #define SETPOINT_MAX 50.0f     /* Maximum setpoint */
+
+#define PID_KP 10.0f /* Proportional Gain */
+#define PID_KI 0.0f  /* Integral Gain (Unused) */
+#define PID_KD 0.0f  /* Derivative Gain (Unused) */
 
 #define OUTPUT_MIN 0.0f   /* Minimum PWM output (%) */
 #define OUTPUT_MAX 100.0f /* Maximum PWM output (%) */
@@ -71,7 +75,7 @@ int main(void) {
   UART_SendString("\r\n");
   UART_SendString(
       "================================================================\r\n");
-  UART_SendString("   AUTOMATIC FAN SPEED CONTROL (ON/OFF CONTROL)\r\n");
+  UART_SendString("   AUTOMATIC FAN SPEED CONTROL (P-CONTROLLER)\r\n");
   UART_SendString("   TUGAS BESAR MIKROPROSESOR & SISTEM KENDALI MEKANIKA\r\n");
   UART_SendString("   STM32F411 Black Pill - Register Level Programming\r\n");
   UART_SendString(
@@ -87,7 +91,9 @@ int main(void) {
   UART_SendString("  Setpoint = ");
   UART_SendFloat(setpoint, 1);
   UART_SendString(" C\r\n");
-  UART_SendString("  Type: Simple On/Off\r\n");
+  UART_SendString("  Type: Proportional Control (KP=");
+  UART_SendFloat(PID_KP, 1);
+  UART_SendString(")\r\n");
   UART_SendString("\r\n\r\n");
 
   /* Test LED */
@@ -121,13 +127,13 @@ int main(void) {
   UART_SendString("[BOOT] DS18B20 detected OK!\r\n\r\n");
 
   /* Print Control Info */
-  UART_SendString("CONTROLS (Simple On/Off):\r\n");
+  UART_SendString("CONTROLS:\r\n");
   UART_SendString("  BTN1 (PB4): Increase setpoint +1 C\r\n");
   UART_SendString("  BTN2 (PB5): Decrease setpoint -1 C\r\n\r\n");
 
   UART_SendString("BEHAVIOR:\r\n");
-  UART_SendString("  Temp > Setpoint -> Fan MAX\r\n");
-  UART_SendString("  Temp <= Setpoint -> Fan OFF\r\n\r\n");
+  UART_SendString("  Error = Temp - Setpoints\r\n");
+  UART_SendString("  Output = Error * KP\r\n\r\n");
 
   UART_SendString(">>> Starting Control Loop...\r\n\r\n");
 
@@ -155,13 +161,21 @@ int main(void) {
       /* ========== 1. Baca suhu dari DS18B20 ========== */
       current_temperature = DS18B20_ReadTemperature();
 
-      /* ========== 2. Hitung Output (On/Off) ========== */
+      /* ========== 2. Hitung Output (Proportional Control) ========== */
+      float error = current_temperature - setpoint;
       float output = 0.0f;
-      if (current_temperature > setpoint) {
-        output = OUTPUT_MAX;
+
+      if (error > 0) {
+        output = error * PID_KP;
       } else {
-        output = OUTPUT_MIN;
+        output = 0.0f; /* No cooling, fan off if temp <= setpoint */
       }
+
+      /* Clamp Output */
+      if (output > OUTPUT_MAX)
+        output = OUTPUT_MAX;
+      if (output < OUTPUT_MIN)
+        output = OUTPUT_MIN;
 
       /* ========== 3. Set Fan Speed ========== */
       Set_Fan_Speed_RegisterLevel((uint8_t)output);
