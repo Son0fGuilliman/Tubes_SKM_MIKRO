@@ -142,23 +142,23 @@ Template paragraf:
 
 ## 3.1 System Requirements
 
-**[Minimal 150 kata mendefinisikan requirement sistem]**
+Sistem **Automatic Fan Speed Control** bertujuan untuk mengatur kecepatan kipas secara otomatis berdasarkan pembacaan suhu real-time dari sensor, guna menjaga suhu operasional yang optimal pada target perangkat keras. Sistem ini dirancang menggunakan mikrokontroler STM32F411 dengan pendekatan _Register Level Programming_ (tanpa ketergantungan pada HAL library) untuk memaksimalkan efisiensi instruksi dan memberikan kontrol penuh terhadap peripheral perangkat keras. Implementasi sistem mencakup integrasi sinkron berbagai modul seperti GPIO, Timer (PWM & Interrupt Management), dan komunikasi serial.
 
-Template:
+Persyaratan operasional utama sistem mencakup:
 
-Sistem [nama proyek] bertujuan untuk [tujuan utama]. Persyaratan utama:
-
-- Input Handling: [jelaskan jenis input dan response time]
-- Output/Display: [jelaskan tampilan dan update rate]
-- Communication: [jelaskan protokol dan data yang dikomunikasikan]
+- **Input Handling**: Sistem harus mampu mengakuisisi data suhu lingkungan dari sensor digital DS18B20 menggunakan protokol _OneWire_ bit-banging dengan resolusi 9-12 bit dan interval sampling minimum 750 ms. Selain itu, sistem menyediakan antarmuka interaktif melalui dua tombol fisik (Active Low) untuk konfigurasi _Setpoint_ suhu secara dinamis. Algoritma _software debouncing_ berbasis _system tick_ diterapkan untuk memastikan integritas sinyal input dari pengguna.
+- **Output/Display**: Sistem mengimplementasikan algoritma kendali **Proportional (P-Controller)** untuk mengatur kecepatan putar kipas secara linear terhadap deviasi suhu (_error_). Output sinyal kendali berupa gelombang PWM (_Pulse Width Modulation_) yang dibangkitkan oleh Timer 1 dengan resolusi presisi. Sebagai umpan balik visual instan, sistem mengendalikan tiga indikator LED: Hijau (Aman/Target Tercapai), Kuning (Proses Pendinginan/Linear Region), dan Merah (Critical/Saturasi Maksimal).
+- **Communication**: Sistem wajib menyediakan antarmuka _Telemetri_ real-time melalui protokol komunikasi asinkron UART (USART1) dengan kecepatan 115200 baud. Sistem mengirimkan buffer data terformat setiap detik yang berisi informasi vital: _timestamp_ operasi, pembacaan suhu aktual, _setpoint_ aktif, dan _duty cycle_ kipas. Data ini digunakan untuk verifikasi respon sistem dan _tuning_ parameter kendali pada sisi komputer host.
 
 ## 3.2 Functional Requirements
 
-| ID    | Requirement                   | Priority |
-| ----- | ----------------------------- | -------- |
-| FR-01 | [Fungsi 1]                    | High     |
-| FR-02 | [Fungsi 2 bisa melakukan .. ] | High     |
-| FR-03 | [Fungsi 3]                    | Medium   |
+| ID    | Requirement                                                                                                        | Priority |
+| ----- | ------------------------------------------------------------------------------------------------------------------ | -------- |
+| FR-01 | Sistem harus mampu membaca data suhu dari sensor DS18B20 dengan presisi minimal 0.5°C setiap 750-1000ms.           | High     |
+| FR-02 | Sistem harus mampu mengatur kecepatan kipas (PWM) secara otomatis dan linear berdasarkan selisih suhu vs setpoint. | High     |
+| FR-03 | Sistem harus menyediakan antarmuka tombol untuk mengubah nilai _Setpoint_ suhu (naik/turun) secara _real-time_.    | High     |
+| FR-04 | Sistem harus memberikan indikasi visual status termal (Aman/Warning/Critical) melalui 3 warna LED berbeda.         | Medium   |
+| FR-05 | Sistem harus mengirimkan data telemetri (Suhu, Setpoint, Fan Speed) ke Serial Monitor via UART setiap detik.       | Medium   |
 
 ## 3.3 System Specifications
 
@@ -176,20 +176,32 @@ Sistem [nama proyek] bertujuan untuk [tujuan utama]. Persyaratan utama:
 
 **Pin Mapping:**
 
-| Pin STM32   | Connect To | Fungsi    | Peripheral   |
-| ----------- | ---------- | --------- | ------------ |
-| PB6         | LCD SCL    | I2C Clock | I2C1_SCL     |
-| PB7         | LCD SDA    | I2C Data  | I2C1_SDA     |
-| PA0         | Button 1   | Input     | EXTI0        |
-| [tambahkan] | [device]   | [fungsi]  | [peripheral] |
+| Pin STM32 | Connect To                   | Fungsi                             | Peripheral  |
+| --------- | ---------------------------- | ---------------------------------- | ----------- |
+| PA0       | Sensor DS18B20               | Input Data Suhu (1-Wire)           | GPIO_OD     |
+| PA8       | Driver Kipas (TIP120/MOSFET) | Output PWM Kecepatan Kipas         | TIM1_CH1    |
+| PA9       | USB-TTL (RX Pin)             | UART TX (Kirim Telemetri)          | USART1_TX   |
+| PA10      | USB-TTL (TX Pin)             | UART RX (Debug Input)              | USART1_RX   |
+| PA13      | ST-Link V2                   | Serial Wire Debug Data (SWDIO)     | SWD         |
+| PA14      | ST-Link V2                   | Serial Wire Debug Clock (SWCLK)    | SWD         |
+| PB0       | LED Hijau                    | Indikator _Safe_ (<= Setpoint)     | GPIO_Output |
+| PB1       | LED Kuning                   | Indikator _Proportional_ (Control) | GPIO_Output |
+| PB2       | LED Merah                    | Indikator _Critical_ (Overheat)    | GPIO_Output |
+| PB4       | Push Button 1                | Tombol Setpoint UP (+1°C)          | GPIO_EXTI4  |
+| PB5       | Push Button 2                | Tombol Setpoint DOWN (-1°C)        | GPIO_EXTI5  |
 
 ### 3.3.2 Software Specifications
 
-- Development Tool: VSCode + PlatformIO + CMISIS + Arduino
-- Programming: C language, register-based
-- Clock: 16 Mhz (HSI) atau 100MHz (HSE + PLL)
-- Communication: I2C (100kHz) / UART (9600 baud)
-- Timer: 1MHz (1μs resolution)
+- **Development Environment**: VSCode + PlatformIO
+- **Framework & Library**: STM32Cube (CMSIS Core) - _Pure Register Level Programming_ (No HAL/LL drivers used)
+- **Programming Language**: C (Standards C99/C11)
+- **System Clock**: 100 MHz (Source: HSI 16MHz -> PLL)
+- **Data Communication**:
+  - UART: 9,600 bps, 8 Data bits, No Parity, 1 Stop bit (8N1)
+  - OneWire: Bit-banging protocol (custom implementation for DS18B20)
+- **Timer Configuration**:
+  - TIM1: PWM Generation (20 kHz)
+  - TIM2: System Tick & Interrupt (1 uS Resolution)
 
 ---
 
@@ -197,9 +209,23 @@ Sistem [nama proyek] bertujuan untuk [tujuan utama]. Persyaratan utama:
 
 ## 4.1 Arsitektur Sistem
 
-**Block Diagram:**
+**Block Diagram (Closed Loop System):**
 
-[Gambar block diagram sistem keseluruhan]
+```mermaid
+graph LR
+    Input((Input)) -- Setpoint --> Comp((Comparator))
+    Comp -- Error signal --> Controller[Controller<br/>STM32 P-Control]
+    Controller -- Actuating signal --> Plant[Plant<br/>Thermal Chamber]
+    Plant -- Output --> Out((Output))
+    Plant -- Output --> Feedback[Feedback Element<br/>DS18B20]
+    Feedback -- Feedback signal --> Comp
+
+    style Controller fill:#f9f,stroke:#333
+    style Plant fill:#ffdfba,stroke:#333
+    style Feedback fill:#baffc9,stroke:#333
+```
+
+Sistem ini menerapkan **Closed-Loop Control System** karena terdapat umpan balik (_feedback_) dari sensor suhu. Pembacaan suhu aktual dikembalikan ke kontroler untuk dibandingkan dengan _setpoint_ yang diinginkan, menghasilkan sinyal _error_ yang dikoreksi secara terus-menerus oleh algoritma P-Controller.
 
 ## 4.2 Desain Hardware
 
@@ -227,21 +253,64 @@ Minimal berisi:
 
 ### 4.3.1 Flowchart Sistem
 
-[Gambar flowchart main program]
+```mermaid
+flowchart TD
+    Start([START]) --> Init[Init System<br/>Clock, GPIO, UART, Timer, 1-Wire]
+    Init --> BootMsg[Print Config & Welcome Msg]
+    BootMsg --> Loop{Main Loop}
 
-START
+    Loop --> CheckSP{Setpoint Changed?}
+    CheckSP -- Yes --> PrintSP[Print New Setpoint] --> CheckTimer
+    CheckSP -- No --> CheckTimer
 
-↓
+    CheckTimer{Timer Flag 1s?}
+    CheckTimer -- No --> Delay[Delay 10ms] --> Loop
+    CheckTimer -- Yes --> ReadTemp[Read DS18B20 Temp]
 
-Initialize System
+    ReadTemp --> CalcErr[Error = Temp - Setpoint]
+    CalcErr --> CalcP[Output = Error * Kp]
+    CalcP --> Clamp{Clamp Output?}
+    Clamp -- >100% --> SetMax[Output = 100]
+    Clamp -- <0% --> SetMin[Output = 0]
+    Clamp -- 0-100% --> SetPWM[Set Fan Speed PWM]
 
-(Clock, GPIO, I2C, Timer, EXTI)
+    SetMax --> SetPWM
+    SetMin --> SetPWM
 
-↓
+    SetPWM --> LED[Update LEDs Green/Yellow/Red]
+    LED --> Tele[Print Telemetry UART]
+    Tele --> Loop
+```
 
 ### 4.3.2 State Machine Diagram
 
-[Gambar state machine]
+```mermaid
+stateDiagram-v2
+    [*] --> SAFE
+
+    SAFE: **SAFE STATE**
+    SAFE: Temp <= Setpoint
+    SAFE: LED = Green
+    SAFE: Fan = 0%
+
+    CONTROL: **CONTROL STATE**
+    CONTROL: Setpoint < Temp <= Margin
+    CONTROL: LED = Yellow
+    CONTROL: Fan = Proportional (1-99%)
+
+    CRITICAL: **CRITICAL STATE**
+    CRITICAL: Temp > Setpoint + Margin
+    CRITICAL: LED = Red
+    CRITICAL: Fan = Max (100%)
+
+    SAFE --> CONTROL : Temp > Setpoint
+    CONTROL --> SAFE : Temp <= Setpoint
+
+    CONTROL --> CRITICAL : Temp > Margin
+    CRITICAL --> CONTROL : Temp <= Margin
+
+    SAFE --> CRITICAL : (Sudden Heat Spike)
+```
 
 ### 4.3.3 Timing Diagram
 
@@ -263,17 +332,37 @@ SDA ────┐ ┌──[A6..A0]──┬──[Data]──┬──
 
 **Design Debouncing:**
 
-Waktu stabil button setelah bounce:
+Sistem menerapkan **Software Debouncing** berbasis waktu (_Time-based_) menggunakan `SysTick` timer. Hal ini diperlukan karena tombol mekanis memiliki karakteristik _bouncing_ (sinyal tidak stabil) saat ditekan.
 
-**State Machine:**
+- **Metode**: Ignoring Interrupts inside window.
+- **Threshold Waktu**: 200 ms (`DEBOUNCE_MS`).
+- **Logika**: Setiap kali EXTI terjadi, sistem memeriksa selisih waktu dengan `last_button_time`. Jika `(CurrentTime - LastTime) < 200ms`, maka interrupt dianggap _noise_ (bounce) dan diabaikan.
 
-States: [Released, Pressed, Debouncing]
+**State Machine (Button Logic):**
+
+```mermaid
+stateDiagram-v2
+    [*] --> IDLE
+    IDLE --> INTERRUPT : Button Pressed (Falling Edge)
+    INTERRUPT --> DEBOUNCE_CHECK : ISR Handler Called
+
+    state DEBOUNCE_CHECK {
+        [*] --> CheckTime
+        CheckTime --> IGNORE : Delta < 200ms
+        CheckTime --> PROCESS : Delta >= 200ms
+    }
+
+    IGNORE --> IDLE : Return from ISR
+    PROCESS --> UPDATE_SETPOINT : Valid Input
+    UPDATE_SETPOINT --> IDLE : Update Global Var & Flags
+```
 
 Transitions:
 
-- Released → Debouncing: Jika interrupt terjadi
-- Debouncing → Pressed: Jika state stabil selama t_stable
-- Pressed → Released: Jika button dilepas
+- **Idle → Interrupt**: Sinyal fisik jatuh ke LOW (Active-Low), memicu EXTI Handler.
+- **Debounce Check**: Handler membandingkan timestamp saat ini dengan timestamp terakhir.
+- **Ignore**: Jika waktu terlalu singkat (<200ms), dianggap _glitch/bounce_.
+- **Process**: Jika waktu cukup (>200ms), dianggap input valid dan aksi dijalankan.
 
 ### 4.4.2 Subsistem Timing (Timer Dynamics)
 

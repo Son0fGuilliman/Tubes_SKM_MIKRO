@@ -28,11 +28,9 @@ void MX_USART1_Init_RegisterLevel(void) {
 
   /* Baud Rate Calculation */
   /* BRR = APB2_CLOCK / UART_BAUD_RATE */
-  /* Note: This simple calculation might lose precision but matches original
-   * logic if manually set */
-  /* The original code had: USART1->BRR = 0x364; // 115200 baud @ 100MHz */
-  /* Calculation: 100,000,000 / 115200 = 868.055... -> 868 = 0x364 */
-  USART1->BRR = 0x364;
+  /* Target: 9600 baud @ 100MHz */
+  /* Calculation: 100,000,000 / 9600 = 10416.66... -> 10417 = 0x28B1 */
+  USART1->BRR = 0x28B1;
 
   USART1->CR2 = 0;
   USART1->CR3 = 0;

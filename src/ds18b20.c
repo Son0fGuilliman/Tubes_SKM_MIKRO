@@ -78,7 +78,7 @@ float DS18B20_ReadTemperature(void) {
     return -999.0f;
   DS18B20_WriteByte(DS18B20_CMD_SKIP_ROM);
   DS18B20_WriteByte(DS18B20_CMD_CONVERT_T);
-  delay_ms(750); /* Register-based delay - bukan HAL_Delay! */
+  delay_ms(750);
 
   if (!DS18B20_Reset())
     return -999.0f;
