@@ -2,7 +2,7 @@
 #include "stm32f4xx.h" /* CMSIS Header */
 
 /* ============================================================================
- * SYSTEM CLOCK CONFIG (REGISTER LEVEL - NO HAL)
+ * SYSTEM CLOCK CONFIG 
  * Target: 100 MHz (HSI 16MHz -> PLL)
  * ============================================================================
  */
@@ -81,7 +81,7 @@ void Error_Handler(void) {
 }
 
 /* ============================================================================
- * GPIO INIT - REGISTER LEVEL
+ * GPIO INIT 
  * ============================================================================
  */
 void MX_GPIO_Init_RegisterLevel(void) {
@@ -139,7 +139,7 @@ void MX_GPIO_Init_RegisterLevel(void) {
 }
 
 /* ============================================================================
- * TIM2 TIMER INTERRUPT INIT - REGISTER LEVEL
+ * TIM2 TIMER INTERRUPT INIT 
  * ============================================================================
  */
 void MX_TIM2_Interrupt_Init_RegisterLevel(void) {

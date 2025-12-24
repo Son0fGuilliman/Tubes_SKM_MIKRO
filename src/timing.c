@@ -3,7 +3,7 @@
 volatile uint32_t systick_counter = 0;
 
 /* ============================================================================
- * TIMING FUNCTIONS - REGISTER LEVEL
+ * TIMING FUNCTIONS 
  * ============================================================================
  */
 
@@ -27,7 +27,7 @@ void SysTick_Init_RegisterLevel(void) {
   SysTick->LOAD = (SystemCoreClock / 1000) - 1;
 
   /* Clear current value */
-  SysTick->VAL = 0;
+  SysTick->VAL = [10;
 
   /* Set priority (optional) */
   NVIC_SetPriority(SysTick_IRQn, 0);

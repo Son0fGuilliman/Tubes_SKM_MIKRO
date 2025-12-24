@@ -366,18 +366,34 @@ Transitions:
 
 ### 4.4.2 Subsistem Timing (Timer Dynamics)
 
-**Konfigurasi Timer Counter:**
+**Konfigurasi SysTick Timer:**
 
-- Clock source: APB1 × 1 = 16MHz
-- Prescaler: PSC = 16 - 1 = 15
-- f_timer = 16MHz / 16 = 1MHz
-- Resolution: 1μs per count
+- **Source**: Processor Clock (100 MHz)
+- **Target**: Interrupt setiap 1 ms
+- **Reload Value (LOAD)**: `(100MHz / 1000) - 1 = 99,999`
+- **Functions**: `delay_ms()` & `HAL_GetTick()` replacement.
 
-**Auto-Reload Register (ARR):**
+**State Machine (Timer Loop):**
 
-Untuk interrupt setiap 1ms:
+```mermaid
+stateDiagram-v2
+    [*] --> RESET
+    RESET --> COUNTING : Enable Timer
 
-ARR = (1ms × 1MHz) - 1 = 999
+    state COUNTING {
+        [*] --> DECREMENT
+        DECREMENT --> CHECK_ZERO : Value--
+        CHECK_ZERO --> DECREMENT : Value > 0
+        CHECK_ZERO --> UNDERFLOW : Value == 0
+    }
+
+    UNDERFLOW --> INTERRUPT : Trigger SysTick_Handler
+    UNDERFLOW --> RELOAD : Load Value from LOAD Register
+    RELOAD --> COUNTING
+
+    INTERRUPT --> UPDATE_VAR : systick_counter++
+    UPDATE_VAR --> [*] : Return from ISR
+```
 
 ### 4.4.3 Subsistem Display (I2C Communication)
 
@@ -430,79 +446,142 @@ Dengan:
 
 ## 5.2 Implementasi Software (Register-Based)
 
-### 5.2.1 RCC Configuration
+### 5.2.1 RCC Configuration (System Clock)
 
 **Kode:**
 
 ```c
-void RCC_init(void) {
-    // [Lengkapi dengan penjelasan setiap register]
+void SystemClock_Config(void) {
+  /* 1. Enable HSI & Power */
+  RCC->CR |= RCC_CR_HSION;
+  RCC->APB1ENR |= RCC_APB1ENR_PWREN;
+  PWR->CR |= PWR_CR_VOS;
+
+  /* 2. Configure Flash Latency for 100MHz */
+  FLASH->ACR = FLASH_ACR_PRFTEN | FLASH_ACR_ICEN | FLASH_ACR_DCEN | FLASH_ACR_LATENCY_3WS;
+
+  /* 3. Configure PLL (HSI=16MHz, M=16, N=200, P=2, Q=4 -> SYSCLK=100MHz) */
+  RCC->PLLCFGR = (16 << 0) | (200 << 6) | (0 << 16) | RCC_PLLCFGR_PLLSRC_HSI | (4 << 24);
+
+  /* 4. Enable PLL & Switch */
+  RCC->CR |= RCC_CR_PLLON;
+  while (!(RCC->CR & RCC_CR_PLLRDY)); // Wait PLL Ready
+
+  RCC->CFGR |= RCC_CFGR_SW_PLL; // Switch System Clock source
+  while ((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_PLL); // Wait for Switch
 }
 ```
 
 **Penjelasan Register:**
 
-| Register | Bit   | Value    | Fungsi   |
-| -------- | ----- | -------- | -------- |
-| RCC->x   |       | 1        |          |
-| RCC->x   |       | 1 (read) |          |
-| [dst]    | [bit] | [value]  | [fungsi] |
+| Register       | Bit     | Value    | Fungsi                                                         |
+| -------------- | ------- | -------- | -------------------------------------------------------------- |
+| `RCC->CR`      | `HSION` | 1        | Menyalakan osilator internal HSI (16MHz).                      |
+| `RCC->PLLCFGR` | `PLLM`  | 16       | Division factor untuk input PLL (16MHz / 16 = 1MHz).           |
+| `RCC->PLLCFGR` | `PLLN`  | 200      | Multiplication factor untuk VCO (1MHz \* 200 = 200MHz).        |
+| `RCC->PLLCFGR` | `PLLP`  | 0 (Div2) | Division factor untuk Main System Clock (200MHz / 2 = 100MHz). |
+| `RCC->CFGR`    | `SW`    | 10 (PLL) | Memilih PLL sebagai sumber _System Clock_.                     |
 
 ### 5.2.2 GPIO Configuration
 
 **Kode:**
 
 ```c
-void GPIO_Config(void) {
-    // [Kode konfigurasi GPIO]
+void MX_GPIO_Init_RegisterLevel(void) {
+  /* Enable Clocks for GPIOA & GPIOB */
+  RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN;
+
+  /* PA8: TIM1_CH1 (PWM Output) - Alternate Function */
+  GPIOA->MODER |= GPIO_MODER_MODER8_1; // AF Mode
+  GPIOA->AFR[1] |= (1 << 0); // AF1 (TIM1)
+
+  /* PB0, PB1, PB2: LEDs (Output Push-Pull) */
+  GPIOB->MODER |= (1 << 0) | (1 << 2) | (1 << 4); // Output Mode
+
+  /* PB4, PB5: Buttons (Input Pull-up) */
+  GPIOB->MODER &= ~(GPIO_MODER_MODER4 | GPIO_MODER_MODER5); // Input Mode
+  GPIOB->PUPDR |= (1 << 8) | (1 << 10); // Pull-up enabled
 }
 ```
 
-**Penjelasan Register:** [Tabel penjelasan]
+**Penjelasan Register:**
 
-### 5.2.4 Timer Configuration
+| Register       | Bit       | Fungsi                                                   |
+| -------------- | --------- | -------------------------------------------------------- |
+| `RCC->AHB1ENR` | `GPIOAEN` | Mengaktifkan clock bus AHB1 untuk Port A.                |
+| `GPIO->MODER`  | `01`      | Konfigurasi pin sebagai _Generic Output_ (LED).          |
+| `GPIO->MODER`  | `10`      | Konfigurasi pin sebagai _Alternate Function_ (PWM).      |
+| `GPIO->PUPDR`  | `01`      | Mengaktifkan resistor _Pull-up_ internal (untuk Tombol). |
+
+### 5.2.4 Timer Configuration (PWM Generation)
 
 **Kode:**
 
 ```c
-void Timer_Config(void) {
-    // [Kode konfigurasi Timer]
+void MX_TIM1_PWM_Init_RegisterLevel(void) {
+  /* Enable TIM1 Clock */
+  RCC->APB2ENR |= RCC_APB2ENR_TIM1EN;
+
+  /* Time Base: 100MHz / 1000 = 100kHz Counter */
+  TIM1->PSC = 999;
+  /* Period: 100kHz / 1000 = 100Hz PWM Frequency */
+  TIM1->ARR = 999;
+
+  /* PWM Mode 1 on Channel 1 */
+  TIM1->CCMR1 |= (6 << 4);
+  TIM1->CCER |= TIM_CCER_CC1E; // Enable Output
+  TIM1->BDTR |= TIM_BDTR_MOE; // Main Output Enable
+  TIM1->CR1 |= TIM_CR1_CEN; // Start Timer
 }
 ```
 
-**Penjelasan Register:** [Tabel penjelasan]
+**Penjelasan Register:**
+
+| Register     | Value  | Fungsi                                                                           |
+| ------------ | ------ | -------------------------------------------------------------------------------- |
+| `TIM->PSC`   | 999    | _Prescaler_: Membagi frekuensi clock input (100MHz -> 100kHz).                   |
+| `TIM->ARR`   | 999    | _Auto-Reload_: Menentukan nilai maksimum counter (Resolusi PWM 1000 step/100Hz). |
+| `TIM->CCMR1` | 0x60   | Memilih _PWM Mode 1_ (Output High selama CNT < CCR1).                            |
+| `TIM->CCR1`  | 0-1000 | _Capture/Compare_: Menentukan _Duty Cycle_ (0-100% dipetakan ke 0-1000).         |
 
 ### 5.2.5 External Interrupt Configuration
 
 **Kode:**
 
 ```c
-void EXTI_Config(void) {
-    // [Kode konfigurasi EXTI]
-}
-```
+  /* Connect EXTI Line 4 & 5 to Port B */
+  SYSCFG->EXTICR[1] |= SYSCFG_EXTICR2_EXTI4_PB | SYSCFG_EXTICR2_EXTI5_PB;
 
-**Penjelasan Register:** [Tabel penjelasan]
+  /* Unmask Interrupt & Set Trigger to Falling Edge */
+  EXTI->IMR |= (1 << 4) | (1 << 5);
+  EXTI->FTSR |= (1 << 4) | (1 << 5);
+
+  /* Enable NVIC */
+  NVIC_EnableIRQ(EXTI4_IRQn);
+  NVIC_EnableIRQ(EXTI9_5_IRQn);
+```
 
 ### 5.2.6 Interrupt Service Routines
 
 **Kode:**
 
 ```c
-void TIM2_IRQHandler(void) {
-    // [Kode ISR]
-}
+void EXTI4_IRQHandler(void) {
+  if (EXTI->PR & (1 << 4)) { // Check if pending bit is set
+    EXTI->PR = (1 << 4); // Clear pending bit (Write 1 to clear)
 
-void EXTI0_IRQHandler(void) {
-    // [Kode ISR]
+    // ... [Debounce Logic] ...
+
+    if (setpoint < SETPOINT_MAX) setpoint++; // Action
+  }
 }
 ```
 
 **Analisis ISR:**
 
-- Execution time: [waktu]
-- Priority: [level priority]
-- Critical section: [bagian critical]
+- **Critical Section**: Pengubahan variabel global `setpoint` dilakukan di dalam ISR untuk memastikan atomisitas respon terhadap input tombol.
+- **Priority**: EXTI diset dengan prioritas _default_ (lebih rendah dari System Tick) agar tidak memblokir timer utama.
+- **Clear Flag**: Sangat penting melakukan `EXTI->PR = (1<<4)` di awal/akhir ISR untuk mencegah _infinite loop interrupt_.
 
 ## 5.3 Pembagian Tugas Kelompok
 
