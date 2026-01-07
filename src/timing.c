@@ -27,7 +27,7 @@ void SysTick_Init_RegisterLevel(void) {
   SysTick->LOAD = (SystemCoreClock / 1000) - 1;
 
   /* Clear current value */
-  SysTick->VAL = [10;
+  SysTick->VAL = 0;
 
   /* Set priority (optional) */
   NVIC_SetPriority(SysTick_IRQn, 0);
