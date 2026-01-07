@@ -33,7 +33,6 @@ static volatile float setpoint = SETPOINT_DEFAULT;
 /* fan_speed_percent is extern in fan.h */
 static volatile uint32_t last_button_time = 0;
 static volatile uint8_t flag_read_temp = 0;
-static volatile uint8_t setpoint_changed = 0;
 
 static inline uint8_t Both_Buttons_Pressed(void) {
   return (GPIOB->IDR & (GPIO_PIN_4 | GPIO_PIN_5)) == 0;
@@ -80,23 +79,9 @@ int main(void) {
   /* Optional: one-time CSV header for UART logging */
   UART_SendString("t,temp,setpoint,fan\r\n");
 
-  /* Test LED */
-  GPIOB->BSRR = GPIO_PIN_0; /* LED Hijau ON */
-  delay_ms(200);
-  GPIOB->BSRR = GPIO_PIN_0 << 16; /* LED Hijau OFF */
-  GPIOB->BSRR = GPIO_PIN_1;       /* LED Kuning ON */
-  delay_ms(200);
-  GPIOB->BSRR = GPIO_PIN_1 << 16;
-  GPIOB->BSRR = GPIO_PIN_2; /* LED Merah ON */
-  delay_ms(200);
-  GPIOB->BSRR = GPIO_PIN_2 << 16;
-
   /* Check DS18B20 */
   if (!DS18B20_Reset()) {
-    while (1) {
-      GPIOB->ODR ^= GPIO_PIN_2;
-      delay_ms(100);
-    }
+    UART_SendString("DS18B20 not detected\r\n");
   }
 
   /* Baca suhu pertama kali */
@@ -105,11 +90,6 @@ int main(void) {
 
   /* ==================== MAIN LOOP ==================== */
   while (1) {
-    /* Cek jika setpoint berubah (dari interrupt) */
-    if (setpoint_changed) {
-      setpoint_changed = 0;
-    }
-
     /* Cek flag dari Timer Interrupt (setiap 1 detik) */
     if (flag_read_temp) {
       flag_read_temp = 0;
@@ -174,7 +154,6 @@ static inline void Handle_Setpoint_Button(uint32_t exti_pr_bit, float delta) {
   float new_setpoint = setpoint + delta;
   if ((new_setpoint >= SETPOINT_MIN) && (new_setpoint <= SETPOINT_MAX)) {
     setpoint = new_setpoint;
-    setpoint_changed = 1;
   }
 }
 
