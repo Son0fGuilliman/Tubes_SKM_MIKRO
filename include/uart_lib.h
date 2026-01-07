@@ -4,7 +4,7 @@
 #include "stm32f4xx.h"
 #include <stdint.h>
 
-#define APB2_CLOCK 100000000u /* 100 MHz */
+#define APB2_CLOCK 16000000u /* Default HSI 16 MHz */
 #define UART_BAUD_RATE 9600u
 
 /* Function Prototypes */

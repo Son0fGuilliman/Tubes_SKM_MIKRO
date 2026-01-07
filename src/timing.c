@@ -17,7 +17,6 @@ void DWT_Init(void) {
   /* Enable cycle counter - Register: DWT->CTRL bit 0 */
   DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
 }
-
 void SysTick_Init_RegisterLevel(void) {
   /* Disable SysTick first */
   SysTick->CTRL = 0;

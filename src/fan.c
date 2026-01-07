@@ -17,16 +17,9 @@ void MX_TIM1_PWM_Init_RegisterLevel(void) {
 
   TIM1->CR1 = 0;
   TIM1->CR2 = 0;
-  /*
-   * PERUBAHAN FREKUENSI PWM:
-   * Sebelumnya: PSC=3 (25MHz), ARR=999 -> 25kHz (Terlalu cepat untuk
-   * transistor/kipas biasa) Sekarang:   PSC=999 (100kHz), ARR=999 -> 100Hz
-   *
-   * Rumus: Freq = SystemCoreClock / ((PSC + 1) * (ARR + 1))
-   *        100  = 100,000,000 / (1000 * 1000)
-   */
-  TIM1->PSC = 999;        /* 100MHz / 1000 = 100kHz */
-  TIM1->ARR = PWM_PERIOD; /* 100kHz / 1000 = 100Hz */
+  /* Default clock (HSI 16MHz, no PLL): 16MHz / (160 * 1000) = 100Hz */
+  TIM1->PSC = 159;
+  TIM1->ARR = PWM_PERIOD; /* 100Hz */
   TIM1->CCR1 = 0;
 
   TIM1->CCMR1 &= ~TIM_CCMR1_OC1M;
