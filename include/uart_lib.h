@@ -4,8 +4,8 @@
 #include "stm32f4xx.h"
 #include <stdint.h>
 
-#define APB2_CLOCK 100000000 /* 100 MHz */
-#define UART_BAUD_RATE 115200
+#define APB2_CLOCK 100000000u /* 100 MHz */
+#define UART_BAUD_RATE 9600u
 
 /* Function Prototypes */
 void MX_USART1_Init_RegisterLevel(void);

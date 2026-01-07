@@ -1,6 +1,4 @@
 #include "stm32f4xx.h"
-#include <stdio.h>
-#include <string.h>
 
 /* Modules */
 #include "debug_utils.h"
@@ -19,13 +17,11 @@
 #define SETPOINT_MAX 50.0f     /* Maximum setpoint */
 
 #define PID_KP 10.0f /* Proportional Gain */
-#define PID_KI 0.0f  /* Integral Gain (Unused) */
-#define PID_KD 0.0f  /* Derivative Gain (Unused) */
 
-#define OUTPUT_MIN 0.0f   /* Minimum PWM output (%) */
 #define OUTPUT_MAX 100.0f /* Maximum PWM output (%) */
 
-#define DEBOUNCE_MS 200
+#define DEBOUNCE_MS 200u
+#define DEBUG_TOGGLE_HOLD_MS 1000u
 
 /* ============================================================================
  * GLOBAL VARIABLES
@@ -33,17 +29,48 @@
  */
 
 /* Control Variables */
-float setpoint = SETPOINT_DEFAULT;
+static volatile float setpoint = SETPOINT_DEFAULT;
 
 /* System State */
 /* fan_speed_percent is extern in fan.h */
-volatile uint32_t last_button_time = 0;
-volatile uint8_t flag_read_temp = 0;
-volatile uint8_t setpoint_changed = 0;
+static volatile uint32_t last_button_time = 0;
+static volatile uint8_t flag_read_temp = 0;
+static volatile uint8_t setpoint_changed = 0;
+static uint8_t debug_enabled = 1;
 
-float current_temperature = 0.0f;
-uint8_t sensor_ok = 0;
-uint32_t seconds_counter = 0;
+static inline uint8_t Both_Buttons_Pressed(void) {
+  return (GPIOB->IDR & (GPIO_PIN_4 | GPIO_PIN_5)) == 0;
+}
+
+static void Handle_Debug_Toggle(void) {
+  static uint8_t toggled_for_hold = 0;
+  static uint32_t hold_start = 0;
+
+  uint32_t now = GetTick();
+
+  if (!Both_Buttons_Pressed()) {
+    toggled_for_hold = 0;
+    hold_start = 0;
+    return;
+  }
+
+  if (hold_start == 0)
+    hold_start = now;
+
+  if (toggled_for_hold || ((now - hold_start) < DEBUG_TOGGLE_HOLD_MS))
+    return;
+
+  if (debug_enabled) {
+    UART_SendString("\r\n>>> DEBUG OFF\r\n");
+    debug_enabled = 0;
+  } else {
+    debug_enabled = 1;
+    UART_SendString("\r\n>>> DEBUG ON\r\n");
+    Print_Control_Header();
+  }
+
+  toggled_for_hold = 1;
+}
 
 /* ============================================================================
  * MAIN FUNCTION
@@ -111,9 +138,7 @@ int main(void) {
 
   /* Check DS18B20 */
   UART_SendString("[BOOT] Detecting DS18B20 sensor...\r\n");
-  sensor_ok = DS18B20_Reset();
-
-  if (!sensor_ok) {
+  if (!DS18B20_Reset()) {
     UART_SendString("\r\n[ERROR] DS18B20 NOT DETECTED!\r\n");
     UART_SendString(
         "Check: DQ -> PA0, VDD -> 3.3V, GND -> GND, 4.7K pull-up\r\n");
@@ -137,21 +162,28 @@ int main(void) {
 
   UART_SendString(">>> Starting Control Loop...\r\n\r\n");
 
-  Print_Control_Header();
+  if (debug_enabled)
+    Print_Control_Header();
 
   /* Baca suhu pertama kali */
-  current_temperature = DS18B20_ReadTemperature();
+  float current_temperature = DS18B20_ReadTemperature();
+  uint32_t seconds_counter = 0;
 
   /* ==================== MAIN LOOP ==================== */
   while (1) {
+    Handle_Debug_Toggle();
+
     /* Cek jika setpoint berubah (dari interrupt) */
     if (setpoint_changed) {
       setpoint_changed = 0;
-      UART_SendString("\r\n>>> Setpoint changed to: ");
-      UART_SendFloat(setpoint, 1);
-      UART_SendString(" C\r\n");
+      if (debug_enabled) {
+        float current_setpoint = setpoint;
+        UART_SendString("\r\n>>> Setpoint changed to: ");
+        UART_SendFloat(current_setpoint, 1);
+        UART_SendString(" C\r\n");
 
-      Print_Control_Header();
+        Print_Control_Header();
+      }
     }
 
     /* Cek flag dari Timer Interrupt (setiap 1 detik) */
@@ -162,27 +194,22 @@ int main(void) {
       current_temperature = DS18B20_ReadTemperature();
 
       /* ========== 2. Hitung Output (Proportional Control) ========== */
-      float error = current_temperature - setpoint;
-      float output = 0.0f;
-
-      if (error > 0) {
-        output = error * PID_KP;
-      } else {
-        output = 0.0f; /* No cooling, fan off if temp <= setpoint */
-      }
+      float current_setpoint = setpoint;
+      float error = current_temperature - current_setpoint;
+      float output = (error > 0.0f) ? (error * PID_KP) : 0.0f;
 
       /* Clamp Output */
       if (output > OUTPUT_MAX)
         output = OUTPUT_MAX;
-      if (output < OUTPUT_MIN)
-        output = OUTPUT_MIN;
 
       /* ========== 3. Set Fan Speed ========== */
       Set_Fan_Speed_RegisterLevel((uint8_t)output);
 
       /* ========== 4. Print status ========== */
-      Print_Status(seconds_counter, current_temperature, setpoint,
-                   fan_speed_percent);
+      if (debug_enabled) {
+        Print_Status(seconds_counter, current_temperature, current_setpoint,
+                     fan_speed_percent);
+      }
 
       seconds_counter++;
     }
@@ -207,40 +234,36 @@ void TIM2_IRQHandler(void) {
   }
 }
 
+static inline void Handle_Setpoint_Button(uint32_t exti_pr_bit, float delta) {
+  if (!(EXTI->PR & exti_pr_bit)) {
+    return;
+  }
+  EXTI->PR = exti_pr_bit;
+
+  if (Both_Buttons_Pressed())
+    return;
+
+  uint32_t current_time = GetTick();
+  if ((current_time - last_button_time) < DEBOUNCE_MS) {
+    return;
+  }
+  last_button_time = current_time;
+
+  float new_setpoint = setpoint + delta;
+  if ((new_setpoint >= SETPOINT_MIN) && (new_setpoint <= SETPOINT_MAX)) {
+    setpoint = new_setpoint;
+    setpoint_changed = 1;
+  }
+}
+
 /* EXTI4 Interrupt - Button 1 (Setpoint UP) */
 void EXTI4_IRQHandler(void) {
-  if (EXTI->PR & EXTI_PR_PR4) {
-    EXTI->PR = EXTI_PR_PR4;
-
-    /* Debounce menggunakan GetTick() */
-    uint32_t current_time = GetTick();
-    if ((current_time - last_button_time) < DEBOUNCE_MS)
-      return;
-    last_button_time = current_time;
-
-    if (setpoint < SETPOINT_MAX) {
-      setpoint += 1.0f;
-      setpoint_changed = 1;
-    }
-  }
+  Handle_Setpoint_Button(EXTI_PR_PR4, 1.0f);
 }
 
 /* EXTI9_5 Interrupt - Button 2 (Setpoint DOWN) */
 void EXTI9_5_IRQHandler(void) {
-  if (EXTI->PR & EXTI_PR_PR5) {
-    EXTI->PR = EXTI_PR_PR5;
-
-    /* Debounce menggunakan GetTick() */
-    uint32_t current_time = GetTick();
-    if ((current_time - last_button_time) < DEBOUNCE_MS)
-      return;
-    last_button_time = current_time;
-
-    if (setpoint > SETPOINT_MIN) {
-      setpoint -= 1.0f;
-      setpoint_changed = 1;
-    }
-  }
+  Handle_Setpoint_Button(EXTI_PR_PR5, -1.0f);
 }
 
 /* Standard Exception Handlers */
