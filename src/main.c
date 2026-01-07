@@ -1,7 +1,6 @@
 #include "stm32f4xx.h"
 
 /* Modules */
-#include "debug_utils.h"
 #include "ds18b20.h"
 #include "fan.h"
 #include "system_config.h"
@@ -21,7 +20,6 @@
 #define OUTPUT_MAX 100.0f /* Maximum PWM output (%) */
 
 #define DEBOUNCE_MS 200u
-#define DEBUG_TOGGLE_HOLD_MS 1000u
 
 /* ============================================================================
  * GLOBAL VARIABLES
@@ -36,40 +34,21 @@ static volatile float setpoint = SETPOINT_DEFAULT;
 static volatile uint32_t last_button_time = 0;
 static volatile uint8_t flag_read_temp = 0;
 static volatile uint8_t setpoint_changed = 0;
-static uint8_t debug_enabled = 1;
 
 static inline uint8_t Both_Buttons_Pressed(void) {
   return (GPIOB->IDR & (GPIO_PIN_4 | GPIO_PIN_5)) == 0;
 }
 
-static void Handle_Debug_Toggle(void) {
-  static uint8_t toggled_for_hold = 0;
-  static uint32_t hold_start = 0;
-
-  uint32_t now = GetTick();
-
-  if (!Both_Buttons_Pressed()) {
-    toggled_for_hold = 0;
-    hold_start = 0;
-    return;
-  }
-
-  if (hold_start == 0)
-    hold_start = now;
-
-  if (toggled_for_hold || ((now - hold_start) < DEBUG_TOGGLE_HOLD_MS))
-    return;
-
-  if (debug_enabled) {
-    UART_SendString("\r\n>>> DEBUG OFF\r\n");
-    debug_enabled = 0;
-  } else {
-    debug_enabled = 1;
-    UART_SendString("\r\n>>> DEBUG ON\r\n");
-    Print_Control_Header();
-  }
-
-  toggled_for_hold = 1;
+static void UART_LogTelemetry(uint32_t time_sec, float temp, float setpoint,
+                              uint8_t fan_percent) {
+  UART_SendInt((int32_t)time_sec);
+  UART_SendChar(',');
+  UART_SendFloat(temp, 1);
+  UART_SendChar(',');
+  UART_SendFloat(setpoint, 1);
+  UART_SendChar(',');
+  UART_SendInt((int32_t)fan_percent);
+  UART_SendString("\r\n");
 }
 
 /* ============================================================================
@@ -98,33 +77,10 @@ int main(void) {
   /* Set speed awal 0% */
   Set_Fan_Speed_RegisterLevel(0);
 
-  /* ==================== WELCOME MESSAGE ==================== */
-  UART_SendString("\r\n");
-  UART_SendString(
-      "================================================================\r\n");
-  UART_SendString("   AUTOMATIC FAN SPEED CONTROL (P-CONTROLLER)\r\n");
-  UART_SendString("   TUGAS BESAR MIKROPROSESOR & SISTEM KENDALI MEKANIKA\r\n");
-  UART_SendString("   STM32F411 Black Pill - Register Level Programming\r\n");
-  UART_SendString(
-      "================================================================\r\n");
-  UART_SendString("\r\n");
-
-  /* Print Register Configuration */
-  Print_All_Register_Status();
-
-  /* Print Control Configuration */
-  UART_SendString("[ CONTROL CONFIGURATION ]\r\n");
-  UART_SendString("------------------------------------------------\r\n");
-  UART_SendString("  Setpoint = ");
-  UART_SendFloat(setpoint, 1);
-  UART_SendString(" C\r\n");
-  UART_SendString("  Type: Proportional Control (KP=");
-  UART_SendFloat(PID_KP, 1);
-  UART_SendString(")\r\n");
-  UART_SendString("\r\n\r\n");
+  /* Optional: one-time CSV header for UART logging */
+  UART_SendString("t,temp,setpoint,fan\r\n");
 
   /* Test LED */
-  UART_SendString("[BOOT] Testing LEDs...\r\n");
   GPIOB->BSRR = GPIO_PIN_0; /* LED Hijau ON */
   delay_ms(200);
   GPIOB->BSRR = GPIO_PIN_0 << 16; /* LED Hijau OFF */
@@ -134,36 +90,14 @@ int main(void) {
   GPIOB->BSRR = GPIO_PIN_2; /* LED Merah ON */
   delay_ms(200);
   GPIOB->BSRR = GPIO_PIN_2 << 16;
-  UART_SendString("[BOOT] LED test OK\r\n");
 
   /* Check DS18B20 */
-  UART_SendString("[BOOT] Detecting DS18B20 sensor...\r\n");
   if (!DS18B20_Reset()) {
-    UART_SendString("\r\n[ERROR] DS18B20 NOT DETECTED!\r\n");
-    UART_SendString(
-        "Check: DQ -> PA0, VDD -> 3.3V, GND -> GND, 4.7K pull-up\r\n");
-
     while (1) {
       GPIOB->ODR ^= GPIO_PIN_2;
       delay_ms(100);
     }
   }
-
-  UART_SendString("[BOOT] DS18B20 detected OK!\r\n\r\n");
-
-  /* Print Control Info */
-  UART_SendString("CONTROLS:\r\n");
-  UART_SendString("  BTN1 (PB4): Increase setpoint +1 C\r\n");
-  UART_SendString("  BTN2 (PB5): Decrease setpoint -1 C\r\n\r\n");
-
-  UART_SendString("BEHAVIOR:\r\n");
-  UART_SendString("  Error = Temp - Setpoints\r\n");
-  UART_SendString("  Output = Error * KP\r\n\r\n");
-
-  UART_SendString(">>> Starting Control Loop...\r\n\r\n");
-
-  if (debug_enabled)
-    Print_Control_Header();
 
   /* Baca suhu pertama kali */
   float current_temperature = DS18B20_ReadTemperature();
@@ -171,19 +105,9 @@ int main(void) {
 
   /* ==================== MAIN LOOP ==================== */
   while (1) {
-    Handle_Debug_Toggle();
-
     /* Cek jika setpoint berubah (dari interrupt) */
     if (setpoint_changed) {
       setpoint_changed = 0;
-      if (debug_enabled) {
-        float current_setpoint = setpoint;
-        UART_SendString("\r\n>>> Setpoint changed to: ");
-        UART_SendFloat(current_setpoint, 1);
-        UART_SendString(" C\r\n");
-
-        Print_Control_Header();
-      }
     }
 
     /* Cek flag dari Timer Interrupt (setiap 1 detik) */
@@ -205,11 +129,9 @@ int main(void) {
       /* ========== 3. Set Fan Speed ========== */
       Set_Fan_Speed_RegisterLevel((uint8_t)output);
 
-      /* ========== 4. Print status ========== */
-      if (debug_enabled) {
-        Print_Status(seconds_counter, current_temperature, current_setpoint,
-                     fan_speed_percent);
-      }
+      /* ========== 4. UART telemetry log ========== */
+      UART_LogTelemetry(seconds_counter, current_temperature, current_setpoint,
+                        fan_speed_percent);
 
       seconds_counter++;
     }
